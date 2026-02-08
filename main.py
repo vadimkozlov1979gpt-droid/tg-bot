@@ -1,41 +1,51 @@
-from telegram import Bot
-from telegram.ext import Updater
+import os
 from datetime import datetime, timedelta
 import pytz
-import os
+from flask import Flask
+from telegram import Bot
+from apscheduler.schedulers.background import BackgroundScheduler
 
-# Получаем токен и chat_id из переменных окружения (secrets)
-TOKEN = os.environ.get("TOKEN")
-CHAT_ID = os.environ.get("CHAT_ID")
+# ====== Настройки ======
+TOKEN = os.getenv("TOKEN")           # Telegram Bot Token (Environment Variable)
+CHAT_ID = int(os.getenv("CHAT_ID"))  # Telegram chat_id (Environment Variable)
 
 # Московское время
-MOSCOW_TZ = pytz.timezone("Europe/Moscow")
+MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 
-def send_message(context):
-    context.bot.send_message(
-        chat_id=CHAT_ID,
-        text="✅ Тестовое сообщение прямо сейчас!"
+# ====== Flask для Render ======
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot is alive!"
+
+# ====== Функции бота ======
+def send_message():
+    bot = Bot(TOKEN)
+    text = (
+        "✅ Тестовое сообщение!\n\n"
+        "Если вы видите это сообщение, значит бот работает корректно."
     )
-    print("Сообщение отправлено!")
+    bot.send_message(chat_id=CHAT_ID, text=text)
+    print(f"Сообщение отправлено в {datetime.now(MOSCOW_TZ).strftime('%Y-%m-%d %H:%M:%S')} МСК")
 
-def main():
-    # Используем Updater версии 22.x
-    updater = Updater(TOKEN)
-    job_queue = updater.job_queue
+# ====== Планировщик ======
+def schedule_bot():
+    scheduler = BackgroundScheduler(timezone=MOSCOW_TZ)
 
-    # Время запуска через 5 минут
-    now = datetime.now(MOSCOW_TZ)
-    run_time = now + timedelta(minutes=5)
-
-    # Планируем однократное выполнение
-    job_queue.run_once(
+    # Планируем однократное выполнение через 3 минуты
+    run_time = datetime.now(MOSCOW_TZ) + timedelta(minutes=3)
+    scheduler.add_job(
         send_message,
-        when=(run_time - now).total_seconds()
+        'date',
+        run_date=run_time
     )
 
-    updater.start_polling()
-    print(f"🤖 Бот запущен. Сообщение придёт примерно в {run_time.strftime('%H:%M:%S')} (МСК)")
-    updater.idle()
+    scheduler.start()
+    print(f"🤖 Тестовый бот запущен. Сообщение придёт примерно в {run_time.strftime('%H:%M:%S')} МСК...")
 
+# ====== Главный запуск ======
 if __name__ == "__main__":
-    main()
+    schedule_bot()
+    # Flask слушает порт, который Render назначает через переменную PORT
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
