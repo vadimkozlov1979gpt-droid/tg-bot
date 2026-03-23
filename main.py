@@ -39,7 +39,7 @@ async def send_poll():
 # ====== Планируемые функции ======
 def daily_fte_reminder():
     text = (
-        "⏰ Напоминание перед завершением рабочего дня\n\n"
+        "⏰ Конец рабочего дня\n\n"
         "Не забудьте внести данные в "
         "<a href='https://docs.sbermarketing.ru:7052/d/s/12d8kPNA16Yx4ebjWyCkZjhauOHofu8a/rTvtuzYiRiCttTZnk6vh0bCnoH9C3ffn-iLxAd9RXJAw#tid=4'>"
         "таблицу FTE</a> перед выключением компьютера."
@@ -58,7 +58,10 @@ def tuesday_tasks_poll():
     asyncio.run(send_poll())
 
 def friday_balance_check():
-    text = "⚠️ Проверьте, пожалуйста, балансы кабинетов перед выходными."
+    text = (    
+        "⚠️ Конец недели\n\n"    
+        "Проверьте, пожалуйста, балансы кабинетов перед выходными."
+    )
     asyncio.run(send_text(text))
 
 def first_workday_month():
@@ -72,24 +75,27 @@ def first_workday_month():
         if check_date.weekday() < 5:
             return  # Уже был рабочий день → не первый
     # Если дошли сюда → первый рабочий день месяца
-    text = "📅 Начало месяца\n\nНеобходимо внести данные FTE за прошлый месяц."
+    text = (
+        "📅 Начало месяца\n\n"
+        "Необходимо внести данные FTE за прошлый месяц."
+    )
     asyncio.run(send_text(text))
 
 # ====== Планировщик ======
 def schedule_bot():
     scheduler = BackgroundScheduler(timezone=MOSCOW_TZ)
 
-    # 1) Ежедневно (пн-пт) в 18:50
-    scheduler.add_job(daily_fte_reminder, 'cron', day_of_week='mon', hour=14, minute=5)
+     # 1) Ежедневно (пн-пт) в 18:50
+    scheduler.add_job(daily_fte_reminder, 'cron', day_of_week='mon-fri', hour=18, minute=50)
 
     # 2) Вторник в 11:00
-    scheduler.add_job(tuesday_tasks_poll, 'cron', day_of_week='mon', hour=14, minute=6)
+    scheduler.add_job(tuesday_tasks_poll, 'cron', day_of_week='tue', hour=11, minute=0)
 
     # 3) Пятница в 18:00
-    scheduler.add_job(friday_balance_check, 'cron', day_of_week='mon', hour=14, minute=7)
+    scheduler.add_job(friday_balance_check, 'cron', day_of_week='fri', hour=18, minute=0)
 
     # 4) Первый рабочий день месяца в 12:00
-    scheduler.add_job(first_workday_month, 'cron', day_of_week='mon', hour=14, minute=8)
+    scheduler.add_job(first_workday_month, 'cron', day='1-4', hour=12, minute=0)
 
     scheduler.start()
     print("🤖 Бот запущен. Планировщик активен.")
