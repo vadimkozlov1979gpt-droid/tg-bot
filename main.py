@@ -2,57 +2,99 @@ import os
 import asyncio
 from datetime import datetime
 import pytz
-from telegram import Bot
+from flask import Flask
+from telegram import Bot, Poll
+from apscheduler.schedulers.background import BackgroundScheduler
 
 # ====== Настройки ======
-TOKEN = os.getenv("TOKEN")           # Telegram Bot Token (Environment Variable)
-CHAT_ID = int(os.getenv("CHAT_ID"))  # Telegram chat_id (Environment Variable)
+TOKEN = os.getenv("TOKEN")
+CHAT_ID = int(os.getenv("CHAT_ID"))
 MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 
-# ====== Асинхронные функции ======
+# ====== Flask для Render ======
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Bot is alive!"
+
+# ====== Асинхронная функция отправки текста ======
 async def send_text(text):
     bot = Bot(TOKEN)
     await bot.send_message(chat_id=CHAT_ID, text=text, parse_mode="HTML")
-    print(f"Сообщение отправлено в {datetime.now(MOSCOW_TZ).strftime('%Y-%m-%d %H:%M:%S')} МСК")
+    print(f"Сообщение отправлено {datetime.now(MOSCOW_TZ).strftime('%Y-%m-%d %H:%M:%S')} МСК")
 
+# ====== Асинхронная функция отправки опроса ======
 async def send_poll():
     bot = Bot(TOKEN)
     await bot.send_poll(
         chat_id=CHAT_ID,
         question="Вы заполнили таблицу Задачи/Достижения?",
         options=["✅ Заполнил", "❌ Не было запусков"],
-        is_anonymous=False
+        is_anonymous=False,
+        type=Poll.REGULAR
     )
-    print(f"Опрос отправлен в {datetime.now(MOSCOW_TZ).strftime('%Y-%m-%d %H:%M:%S')} МСК")
+    print(f"Опрос отправлен {datetime.now(MOSCOW_TZ).strftime('%Y-%m-%d %H:%M:%S')} МСК")
 
-# ====== Сообщения ======
-async def test_all_messages():
-    # 1) Конец рабочего дня
-    text1 = (
+# ====== Планируемые функции ======
+def daily_fte_reminder():
+    text = (
         "⏰ Напоминание перед завершением рабочего дня\n\n"
-        "Не забудьте внести данные в таблицу FTE перед выключением компьютера: "
-        "<a href='https://docs.sbermarketing.ru:7052/d/s/12d8kPNA16Yx4ebjWyCkZjhauOHofu8a/rTvtuzYiRiCttTZnk6vh0bCnoH9C3ffn-iLxAd9RXJAw#tid=4'>FTE</a>."
+        "Не забудьте внести данные в "
+        "<a href='https://docs.sbermarketing.ru:7052/d/s/12d8kPNA16Yx4ebjWyCkZjhauOHofu8a/rTvtuzYiRiCttTZnk6vh0bCnoH9C3ffn-iLxAd9RXJAw#tid=4'>"
+        "таблицу FTE</a> перед выключением компьютера."
     )
-    await send_text(text1)
+    asyncio.run(send_text(text))
 
-    # 2) Вторник — сообщение + опрос
-    text2 = (
-        "📌 Напоминание\n\n"
-        "Пожалуйста, заполните таблицу с ключевыми событиями по своим блокам до 12:00: "
-        "<a href='https://docs.sbermarketing.ru:7052/d/s/12d7r1jh6FrbhBfshoOG9qIPB0TEm7A4/APBIK5pedZ0IpJVIjt1XxQbUEAr8tH2Q-ALzAYEVVJAw#tid=2'>Задачи/Достижения</a>.\n\n"
-        "После заполнения обязательно отметьтесь в опросе ниже 👇"
+def tuesday_tasks_poll():
+    text = (
+       "📌 Напоминание\n\n"
+        "Пожалуйста, заполните "
+        "<a href='https://docs.sbermarketing.ru:7052/d/s/12d7r1jh6FrbhBfshoOG9qIPB0TEm7A4/APBIK5pedZ0IpJVIjt1XxQbUEAr8tH2Q-ALzAYEVVJAw#tid=2'>"
+        "таблицу с ключевыми событиями</a> по своим блокам до 12:00.\n\n"
+        "После заполнения отметьтесь в опросе ниже 👇"
     )
-    await send_text(text2)
-    await send_poll()
+    asyncio.run(send_text(text))
+    asyncio.run(send_poll())
 
-    # 3) Пятница
-    text3 = "Проверьте, пожалуйста, балансы кабинетов перед выходными."
-    await send_text(text3)
+def friday_balance_check():
+    text = "⚠️ Проверьте, пожалуйста, балансы кабинетов перед выходными."
+    asyncio.run(send_text(text))
 
-    # 4) Первый рабочий день месяца
-    text4 = "📅 Начало месяца\n\nНеобходимо внести данные FTE за прошлый месяц."
-    await send_text(text4)
+def first_workday_month():
+    today = datetime.now(MOSCOW_TZ)
+    # Если сегодня не будний день — выходим
+    if today.weekday() >= 5:
+        return
+    # Проверяем: был ли ранее в этом месяце рабочий день
+    for day in range(1, today.day):
+        check_date = today.replace(day=day)
+        if check_date.weekday() < 5:
+            return  # Уже был рабочий день → не первый
+    # Если дошли сюда → первый рабочий день месяца
+    text = "📅 Начало месяца\n\nНеобходимо внести данные FTE за прошлый месяц."
+    asyncio.run(send_text(text))
 
-# ====== Запуск теста ======
+# ====== Планировщик ======
+def schedule_bot():
+    scheduler = BackgroundScheduler(timezone=MOSCOW_TZ)
+
+    # 1) Ежедневно (пн-пт) в 18:50
+    scheduler.add_job(daily_fte_reminder, 'cron', day_of_week='mon', hour=14, minute=5)
+
+    # 2) Вторник в 11:00
+    scheduler.add_job(tuesday_tasks_poll, 'cron', day_of_week='mon', hour=14, minute=6)
+
+    # 3) Пятница в 18:00
+    scheduler.add_job(friday_balance_check, 'cron', day_of_week='mon', hour=14, minute=7)
+
+    # 4) Первый рабочий день месяца в 12:00
+    scheduler.add_job(first_workday_month, 'cron', day_of_week='mon', hour=14, minute=8)
+
+    scheduler.start()
+    print("🤖 Бот запущен. Планировщик активен.")
+
+# ====== Главный запуск ======
 if __name__ == "__main__":
-    asyncio.run(test_all_messages())
+    schedule_bot()
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
