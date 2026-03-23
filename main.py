@@ -5,12 +5,13 @@ from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
 import asyncio
 
 # ====== Настройки ======
-TOKEN = os.getenv("TOKEN")
-CHAT_ID = int(os.getenv("CHAT_ID"))
+TOKEN = os.getenv("TOKEN")           # Telegram Bot Token (Environment Variable)
+CHAT_ID = int(os.getenv("CHAT_ID"))  # Telegram chat_id (Environment Variable)
+
 MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 
-# ====== Асинхронная функция отправки ======
-async def send_message_async(text, keyboard=None):
+# ====== Функция отправки ======
+async def send_text(text, keyboard=None):
     bot = Bot(TOKEN)
     await bot.send_message(
         chat_id=CHAT_ID,
@@ -20,36 +21,43 @@ async def send_message_async(text, keyboard=None):
     )
     print(f"Сообщение отправлено в {datetime.now(MOSCOW_TZ).strftime('%Y-%m-%d %H:%M:%S')} МСК")
 
-# ====== Тестовая отправка всех сообщений сразу ======
-async def test_send_all():
-    # 1️⃣ Напоминание перед завершением дня
-    text_1 = (
+# ====== Сообщения ======
+async def test_messages():
+    # 1) Перед завершением рабочего дня
+    text1 = (
         "⏰ Напоминание перед завершением рабочего дня\n\n"
         "Не забудьте внести данные в таблицу FTE перед выключением компьютера:\n"
         "<a href='https://docs.sbermarketing.ru:7052/d/s/12d8kPNA16Yx4ebjWyCkZjhauOHofu8a/rTvtuzYiRiCttTZnk6vh0bCnoH9C3ffn-iLxAd9RXJAw#tid=4'>FTE</a>"
     )
-    await send_message_async(text_1)
+    await send_text(text1)
 
-    # 2️⃣ Напоминание вторника с опросом
-    text_2 = (
+    # 2) Вторник / таблица Задачи/Достижения + опрос
+    text2 = (
         "📌 Напоминание\n\n"
         "Пожалуйста, заполните таблицу с ключевыми событиями по своим блокам:\n"
-        "<a href='https://docs.sbermarketing.ru:7052/d/s/12d7r1jh6FrbhBfshoOG9qIPB0TEm7A4/APBIK5pedZ0IpJVIjt1XxQbUEAr8tH2Q-ALzAYEVVJAw#tid=2'>Задачи/Достижения</a> до 12:00."
+        "<a href='https://docs.sbermarketing.ru:7052/d/s/12d7r1jh6FrbhBfshoOG9qIPB0TEm7A4/APBIK5pedZ0IpJVIjt1XxQbUEAr8tH2Q-ALzAYEVVJAw#tid=2'>Задачи/Достижения</a> до 12:00.\n\n"
+        "После заполнения обязательно отметьтесь в опросе ниже 👇"
     )
-    keyboard_2 = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Заполнил", callback_data="filled"),
-         InlineKeyboardButton("❌ Не было запусков", callback_data="not_needed")]
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Заполнил", callback_data="filled")],
+        [InlineKeyboardButton("❌ Не было запусков", callback_data="none")]
     ])
-    await send_message_async(text_2, keyboard_2)
+    await send_text(text2, keyboard=keyboard)
 
-    # 3️⃣ Проверка балансов в пятницу
-    text_3 = "⚠️ Проверьте, пожалуйста, балансы кабинетов перед выходными."
-    await send_message_async(text_3)
+    # 3) Пятница / балансы
+    text3 = (
+        "📊 Напоминание\n\n"
+        "Проверьте, пожалуйста, балансы кабинетов перед выходными."
+    )
+    await send_text(text3)
 
-    # 4️⃣ Первый рабочий день месяца
-    text_4 = "📅 Начало месяца\n\nНеобходимо внести данные FTE за прошлый месяц."
-    await send_message_async(text_4)
+    # 4) Первый рабочий день месяца / FTE за прошлый месяц
+    text4 = (
+        "📅 Начало месяца\n\n"
+        "Необходимо внести данные FTE в битриксе за прошлый месяц."
+    )
+    await send_text(text4)
 
 # ====== Запуск теста ======
 if __name__ == "__main__":
-    asyncio.run(test_send_all())
+    asyncio.run(test_messages())
