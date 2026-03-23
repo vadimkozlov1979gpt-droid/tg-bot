@@ -1,61 +1,54 @@
 import os
-import asyncio
 from datetime import datetime
 import pytz
-from telegram import Bot
+from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup
+import asyncio
 
 # ====== Настройки ======
-TOKEN = os.getenv("TOKEN")           # Telegram Bot Token
-CHAT_ID = int(os.getenv("CHAT_ID"))  # Telegram chat_id
-
+TOKEN = os.getenv("TOKEN")           # Telegram Bot Token (Environment Variable)
+CHAT_ID = int(os.getenv("CHAT_ID"))  # Telegram chat_id (Environment Variable)
 MOSCOW_TZ = pytz.timezone('Europe/Moscow')
 
-# ====== Функции отправки сообщений ======
-async def send_message(text, parse_mode="HTML"):
+# ====== Асинхронная функция отправки ======
+async def send_test_messages():
     bot = Bot(TOKEN)
-    await bot.send_message(chat_id=CHAT_ID, text=text, parse_mode=parse_mode)
-    print(f"Сообщение отправлено в {datetime.now(MOSCOW_TZ).strftime('%Y-%m-%d %H:%M:%S')} МСК")
 
-async def send_poll_message():
-    bot = Bot(TOKEN)
-    text = (
+    # 1️⃣ Напоминание перед завершением рабочего дня
+    text1 = (
+        "⏰ Напоминание перед завершением рабочего дня\n\n"
+        "Не забудьте внести данные в "
+        "<a href='https://docs.sbermarketing.ru:7052/d/s/12d8kPNA16Yx4ebjWyCkZjhauOHofu8a/rTvtuzYiRiCttTZnk6vh0bCnoH9C3ffn-iLxAd9RXJAw#tid=4'>"
+        "таблицу FTE</a> перед выключением компьютера."
+    )
+    await bot.send_message(chat_id=CHAT_ID, text=text1, parse_mode="HTML")
+
+    # 2️⃣ Напоминание во вторник + опрос
+    text2 = (
         "📌 Напоминание\n\n"
-        "Пожалуйста, заполните таблицу с ключевыми событиями по своим блокам до 12:00:\n\n"
-        "<a href='https://docs.sbermarketing.ru:7052/d/s/12d7r1jh6FrbhBfshoOG9qIPB0TEm7A4/APBIK5pedZ0IpJVIjt1XxQbUEAr8tH2Q-ALzAYEVVJAw#tid=2'>Задачи/Достижения</a>\n\n"
+        "Пожалуйста, заполните "
+        "<a href='https://docs.sbermarketing.ru:7052/d/s/12d7r1jh6FrbhBfshoOG9qIPB0TEm7A4/APBIK5pedZ0IpJVIjt1XxQbUEAr8tH2Q-ALzAYEVVJAw#tid=2'>"
+        "таблицу с ключевыми событиями</a> по своим блокам до 12:00.\n\n"
         "После заполнения отметьтесь в опросе ниже 👇"
     )
-    await bot.send_message(chat_id=CHAT_ID, text=text, parse_mode="HTML")
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Заполнил", callback_data="filled"),
+         InlineKeyboardButton("❌ Не было запусков", callback_data="not_filled")]
+    ])
+    await bot.send_message(chat_id=CHAT_ID, text=text2, parse_mode="HTML", reply_markup=keyboard)
 
-    # Настоящий опрос
-    question = "Вы заполнили таблицу?"
-    options = ["✅ Заполнил", "❌ Не было запусков"]
-    await bot.send_poll(chat_id=CHAT_ID, question=question, options=options, is_anonymous=False)
-    print(f"Опрос отправлен в {datetime.now(MOSCOW_TZ).strftime('%Y-%m-%d %H:%M:%S')} МСК")
+    # 3️⃣ Напоминание перед выходными
+    text3 = "⚠️ Проверьте, пожалуйста, балансы кабинетов перед выходными."
+    await bot.send_message(chat_id=CHAT_ID, text=text3)
 
-# ====== Отправка всех сообщений сразу ======
-async def send_all_now():
-    # 1) Ежедневное сообщение
-    await send_message(
-        "⏰ Напоминание перед завершением рабочего дня\n\n"
-        "Не забудьте внести данные в таблицу FTE перед выключением компьютера:\n\n"
-        "<a href='https://docs.sbermarketing.ru:7052/d/s/12d8kPNA16Yx4ebjWyCkZjhauOHofu8a/rTvtuzYiRiCttTZnk6vh0bCnoH9C3ffn-iLxAd9RXJAw#tid=4'>FTE</a>"
-    )
-
-    # 2) Вторник – сообщение с опросом
-    await send_poll_message()
-
-    # 3) Пятница – проверка балансов
-    await send_message(
-        "🔔 Напоминание\n\nПроверьте, пожалуйста, балансы кабинетов перед выходными."
-    )
-
-    # 4) Первый рабочий день месяца – FTE за прошлый месяц
-    await send_message(
+    # 4️⃣ Начало месяца
+    text4 = (
         "📅 Начало месяца\n\n"
-        "Необходимо заполнить FTE в битриксе за прошлый месяц:\n"
-        "<a href='https://docs.sbermarketing.ru:7052/d/s/12d8kPNA16Yx4ebjWyCkZjhauOHofu8a/rTvtuzYiRiCttTZnk6vh0bCnoH9C3ffn-iLxAd9RXJAw#tid=4'>FTE</a>"
+        "Необходимо внести данные FTE в Битрикс за прошлый месяц."
     )
+    await bot.send_message(chat_id=CHAT_ID, text=text4)
 
-# ====== Запуск ======
+    print(f"Тестовые сообщения отправлены в {datetime.now(MOSCOW_TZ).strftime('%Y-%m-%d %H:%M:%S')} МСК")
+
+# ====== Запуск теста ======
 if __name__ == "__main__":
-    asyncio.run(send_all_now())
+    asyncio.run(send_test_messages())
